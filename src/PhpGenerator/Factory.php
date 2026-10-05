@@ -112,7 +112,10 @@ final class Factory
 				&& !$prop->isPromoted()
 				&& !$class->isEnum()
 			) {
-				$props[] = $p = $this->fromPropertyReflection($prop);
+				// Reflection subclasses may override property/default lookup behavior.
+				$props[] = $p = $from::class === \ReflectionClass::class || $from::class === \ReflectionObject::class
+					? $this->createProperty($prop, $defaults ??= $prop->getDeclaringClass()->getDefaultProperties())
+					: $this->fromPropertyReflection($prop);
 				if ($withBodies && ($file = $declaringClass->getFileName())) {
 					$hookBodies ??= $this->getExtractor($file)->extractPropertyHookBodies($declaringClass->name);
 					/** @var array<'set'|'get', array{string, bool}> $propHookBodies */
@@ -317,6 +320,13 @@ final class Factory
 	public function fromPropertyReflection(\ReflectionProperty $from): Property
 	{
 		$defaults = $from->getDeclaringClass()->getDefaultProperties();
+		return $this->createProperty($from, $defaults);
+	}
+
+
+	/** @param array<string, mixed> $defaults */
+	private function createProperty(\ReflectionProperty $from, array $defaults): Property
+	{
 		$prop = new Property($from->name);
 		$prop->setValue($defaults[$prop->getName()] ?? null);
 		$prop->setStatic($from->isStatic());
